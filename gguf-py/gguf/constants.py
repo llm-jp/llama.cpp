@@ -262,6 +262,7 @@ class Keys:
         ADD_SEP              = "tokenizer.ggml.add_sep_token"
         ADD_PREFIX           = "tokenizer.ggml.add_space_prefix"
         REMOVE_EXTRA_WS      = "tokenizer.ggml.remove_extra_whitespaces"
+        LSTRIP_TRIGGER_IDS   = "tokenizer.ggml.lstrip_trigger_ids"
         PRECOMPILED_CHARSMAP = "tokenizer.ggml.precompiled_charsmap"
         HF_JSON              = "tokenizer.huggingface.json"
         RWKV                 = "tokenizer.rwkv.world"
@@ -4401,6 +4402,7 @@ KEY_TOKENIZER_PAD_ID     = Keys.Tokenizer.PAD_ID
 KEY_TOKENIZER_MASK_ID    = Keys.Tokenizer.MASK_ID
 KEY_TOKENIZER_HF_JSON    = Keys.Tokenizer.HF_JSON
 KEY_TOKENIZER_RWKV       = Keys.Tokenizer.RWKV
+KEY_TOKENIZER_LSTRIP_TRIGGER_IDS = Keys.Tokenizer.LSTRIP_TRIGGER_IDS
 
 KEY_TOKENIZER_FIM_PRE_ID = Keys.Tokenizer.FIM_PRE_ID
 KEY_TOKENIZER_FIM_SUF_ID = Keys.Tokenizer.FIM_SUF_ID

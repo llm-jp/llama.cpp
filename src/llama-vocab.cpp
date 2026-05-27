@@ -1757,6 +1757,7 @@ struct llama_vocab::impl {
 
     std::vector<llama_token> cache_special_tokens;
     std::vector<std::string> cache_token_to_piece; // llama_token_to_piece(special = true);
+    std::vector<uint32_t>    lstrip_trigger_ids;
     struct pair_hash {
         size_t operator()(const std::pair<std::string, std::string> & p) const {
             return std::hash<std::string>{}(p.first) ^  //create some hash for pair
@@ -1839,6 +1840,9 @@ struct llama_vocab::impl {
     std::string detokenize(
             const std::vector<llama_token> & tokens,
                                       bool   special) const;
+
+    std::vector<uint32_t> get_lstrip_trigger_ids() const;
+    bool is_lstrip_trigger(llama_token token) const;
 
     void print_info() const;
 
@@ -2377,6 +2381,36 @@ void llama_vocab::impl::load(llama_model_loader & ml, const LLM_KV & kv) {
                 }
             }
         }
+    }
+
+    const int lstrip_trigger_ids_keyidx = gguf_find_key(ctx, kv(LLM_KV_TOKENIZER_LSTRIP_TRIGGER_IDS).c_str());
+    if (lstrip_trigger_ids_keyidx != -1) {
+        if (gguf_get_kv_type(ctx, lstrip_trigger_ids_keyidx) != GGUF_TYPE_ARRAY) {
+            throw std::runtime_error("tokenizer lstrip trigger token ids must be an array");
+        }
+
+        const gguf_type arr_type = gguf_get_arr_type(ctx, lstrip_trigger_ids_keyidx);
+        if (arr_type != GGUF_TYPE_UINT32) {
+            throw std::runtime_error("tokenizer lstrip trigger token ids must be a uint32 array");
+        }
+
+        const uint32_t n_ids = gguf_get_arr_n(ctx, lstrip_trigger_ids_keyidx);
+        lstrip_trigger_ids.clear();
+        lstrip_trigger_ids.reserve(n_ids);
+
+        const uint32_t * ids = (const uint32_t *) gguf_get_arr_data(ctx, lstrip_trigger_ids_keyidx);
+        for (uint32_t i = 0; i < n_ids; ++i) {
+            const uint32_t id = ids[i];
+            if (id >= n_tokens) {
+                LLAMA_LOG_WARN(
+                    "%s: ignoring out-of-range lstrip trigger token id %u\n",
+                    __func__, id);
+                continue;
+            }
+            lstrip_trigger_ids.push_back(id);
+        }
+
+        LLAMA_LOG_INFO("%s: lstrip trigger token ids = %zu\n", __func__, lstrip_trigger_ids.size());
     }
 
     init_tokenizer(type);
@@ -3547,10 +3581,13 @@ int32_t llama_vocab::impl::detokenize(
         }
     }
 
+    const bool check_lstrip_trigger = !lstrip_trigger_ids.empty();
+
     for (int32_t i = 0; i < n_tokens; ++i) {
         GGML_ASSERT(avail >= 0);
-        int32_t n_chars = token_to_piece(tokens[i], text, avail, remove_space, unparse_special);
-        remove_space = false;
+        const llama_token token = tokens[i];
+        int32_t n_chars = token_to_piece(token, text, avail, remove_space, unparse_special);
+        remove_space = check_lstrip_trigger && is_lstrip_trigger(token);
         if (n_chars < 0) {
             avail = 0;
             total -= n_chars;
@@ -3922,6 +3959,27 @@ std::vector<char> llama_vocab::get_precompiled_charsmap() const {
     return pimpl->precompiled_charsmap;
 }
 
+std::vector<uint32_t> llama_vocab::impl::get_lstrip_trigger_ids() const {
+    return lstrip_trigger_ids;
+}
+
+std::vector<uint32_t> llama_vocab::get_lstrip_trigger_ids() const {
+    return pimpl->get_lstrip_trigger_ids();
+}
+
+bool llama_vocab::impl::is_lstrip_trigger(llama_token token) const {
+    if (token < 0) {
+        return false;
+    }
+
+    const uint32_t id = (uint32_t) token;
+    return std::find(lstrip_trigger_ids.begin(), lstrip_trigger_ids.end(), id) != lstrip_trigger_ids.end();
+}
+
+bool llama_vocab::is_lstrip_trigger(llama_token token) const {
+    return pimpl->is_lstrip_trigger(token);
+}
+
 int32_t llama_vocab::tokenize(
                   const char * text,
                      int32_t   text_len,
@@ -4027,6 +4085,10 @@ bool llama_vocab_is_eog(const struct llama_vocab * vocab, llama_token token) {
 
 bool llama_vocab_is_control(const struct llama_vocab * vocab, llama_token token) {
     return vocab->is_control(token);
+}
+
+bool llama_vocab_is_lstrip_trigger(const struct llama_vocab * vocab, llama_token token) {
+    return vocab->is_lstrip_trigger(token);
 }
 
 llama_token llama_vocab_bos(const struct llama_vocab * vocab) {

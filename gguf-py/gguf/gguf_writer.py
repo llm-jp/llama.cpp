@@ -1078,6 +1078,14 @@ class GGUFWriter:
     def add_remove_extra_whitespaces(self, value: bool) -> None:
         self.add_bool(Keys.Tokenizer.REMOVE_EXTRA_WS, value)
 
+    def add_lstrip_trigger_ids(self, ids: Sequence[int]) -> None:
+        self.add_key_value(
+            Keys.Tokenizer.LSTRIP_TRIGGER_IDS,
+            ids,
+            GGUFValueType.ARRAY,
+            GGUFValueType.UINT32,
+        )
+
     def add_precompiled_charsmap(self, charsmap: bytes) -> None:
         self.add_array(Keys.Tokenizer.PRECOMPILED_CHARSMAP, charsmap)
 

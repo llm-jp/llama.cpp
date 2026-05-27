@@ -145,6 +145,8 @@ struct llama_vocab {
     std::vector<std::string> get_bpe_merges() const;
 
     std::vector<char> get_precompiled_charsmap() const;
+    std::vector<uint32_t> get_lstrip_trigger_ids() const;
+    bool is_lstrip_trigger(llama_token token) const;
 
     int32_t tokenize(
                    const char * text,

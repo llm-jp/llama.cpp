@@ -94,6 +94,7 @@ class ModelBase:
     metadata: gguf.Metadata
     dir_model_card: Path
     remote_hf_model_id: str | None
+    lstrip_trigger_tokens: list[str]
 
     # subclasses should define this!
     model_arch: gguf.MODEL_ARCH
@@ -119,7 +120,8 @@ class ModelBase:
                  small_first_shard: bool = False, hparams: dict[str, Any] | None = None, remote_hf_model_id: str | None = None,
                  disable_mistral_community_chat_template: bool = False,
                  sentence_transformers_dense_modules: bool = False,
-                 fuse_gate_up_exps: bool = False):
+                 fuse_gate_up_exps: bool = False,
+                 lstrip_trigger_tokens: list[str] | None = None):
         if type(self) is ModelBase or \
                 type(self) is TextModel or \
                 type(self) is MmprojModel:
@@ -139,6 +141,7 @@ class ModelBase:
         self.remote_hf_model_id = remote_hf_model_id
         self.sentence_transformers_dense_modules = sentence_transformers_dense_modules
         self.fuse_gate_up_exps = fuse_gate_up_exps
+        self.lstrip_trigger_tokens = lstrip_trigger_tokens or []
         self._gate_exp_buffer: dict[int, Tensor] = {}
         self._up_exp_buffer: dict[int, Tensor] = {}
         self.hparams = ModelBase.load_hparams(self.dir_model, self.is_mistral_format) if hparams is None else hparams
@@ -1760,6 +1763,21 @@ class TextModel(ModelBase):
         special_vocab._set_special_token("unk", tokenizer.special_tokens["<|endoftext|>"])  # ty: ignore[unresolved-attribute]
         special_vocab.add_to_gguf(self.gguf_writer)
 
+    def _get_lstrip_trigger_ids(self, tokens: list[bytes]) -> list[int]:
+        token_to_id = {token.decode("utf-8", errors="replace"): i for i, token in enumerate(tokens)}
+
+        result: list[int] = []
+        for token in self.lstrip_trigger_tokens:
+            token_id = token_to_id.get(token)
+            if token_id is None:
+                logger.warning(
+                    f"ignore lstrip trigger token {token!r}: token is not in vocab"
+                )
+            else:
+                result.append(token_id)
+
+        return sorted(set(result))
+
     def _set_vocab_sentencepiece(self, add_to_gguf=True):
         tokens, scores, toktypes = self._create_vocab_sentencepiece()
 
@@ -1768,6 +1786,11 @@ class TextModel(ModelBase):
         self.gguf_writer.add_token_list(tokens)
         self.gguf_writer.add_token_scores(scores)
         self.gguf_writer.add_token_types(toktypes)
+
+        lstrip_trigger_ids = self._get_lstrip_trigger_ids(tokens)
+        if lstrip_trigger_ids:
+            logger.info(f"Setting lstrip trigger ids to {lstrip_trigger_ids}")
+            self.gguf_writer.add_lstrip_trigger_ids(lstrip_trigger_ids)
 
         special_vocab = gguf.SpecialVocab(self.dir_model, n_vocab=len(tokens))
         special_vocab.add_to_gguf(self.gguf_writer)

@@ -1642,6 +1642,39 @@ private:
         return slot.has_next_token; // continue
     }
 
+    std::string token_to_piece(llama_token token, bool special, int32_t lstrip) const {
+        std::string piece;
+        piece.resize(piece.capacity());
+        const int n_chars = llama_token_to_piece(vocab, token, &piece[0], piece.size(), lstrip, special);
+        if (n_chars < 0) {
+            piece.resize(-n_chars);
+            int check = llama_token_to_piece(vocab, token, &piece[0], piece.size(), lstrip, special);
+            GGML_ASSERT(check == -n_chars);
+        } else {
+            piece.resize(n_chars);
+        }
+
+        return piece;
+    }
+
+    std::string detokenize_incremental(const server_slot & slot, llama_token token, bool special) const {
+        llama_token prev = LLAMA_TOKEN_NULL;
+        if (!slot.generated_token_probs.empty()) {
+            prev = slot.generated_token_probs.back().tok;
+        } else {
+            const llama_tokens prompt_tokens = slot.prompt.tokens.get_text_tokens();
+            if (!prompt_tokens.empty()) {
+                prev = prompt_tokens.back();
+            }
+        }
+
+        if (prev == LLAMA_TOKEN_NULL || !llama_vocab_is_lstrip_trigger(vocab, prev)) {
+            return common_token_to_piece(slot.ctx_tgt, token, special);
+        }
+
+        return token_to_piece(token, special, 1);
+    }
+
     void populate_token_probs(const server_slot & slot, completion_token_output & result, bool post_sampling, bool special, int idx) const {
         const size_t n_probs_request = slot.task->params.sampling.n_probs;
 
@@ -3309,7 +3342,7 @@ private:
 
                 completion_token_output result;
                 result.tok          = id;
-                result.text_to_send = common_token_to_piece(slot.ctx_tgt, result.tok, accept_special_token(slot, result.tok));
+                result.text_to_send = detokenize_incremental(slot, result.tok, accept_special_token(slot, result.tok));
                 result.prob         = 1.0f; // TODO: set it here instead of doing inside populate_token_probs
 
                 if (slot.task->params.sampling.n_probs > 0) {
@@ -3424,7 +3457,7 @@ private:
                     completion_token_output result;
 
                     result.tok          = ids[i];
-                    result.text_to_send = common_token_to_piece(slot.ctx_tgt, result.tok, accept_special_token(slot, result.tok));
+                    result.text_to_send = detokenize_incremental(slot, result.tok, accept_special_token(slot, result.tok));
                     result.prob         = 1.0f; // set later
 
                     // TODO: set result.probs

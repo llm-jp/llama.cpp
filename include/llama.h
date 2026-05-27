@@ -1063,6 +1063,9 @@ extern "C" {
     // Identify if Token Id is a control token or a render-able token
     LLAMA_API bool llama_vocab_is_control(const struct llama_vocab * vocab, llama_token token);
 
+    // Check whether the token is configured to strip one leading space from the next token during detokenization.
+    LLAMA_API bool llama_vocab_is_lstrip_trigger(const struct llama_vocab * vocab, llama_token token);
+
     // Special tokens
     LLAMA_API llama_token llama_vocab_bos(const struct llama_vocab * vocab); // beginning-of-sentence
     LLAMA_API llama_token llama_vocab_eos(const struct llama_vocab * vocab); // end-of-sentence

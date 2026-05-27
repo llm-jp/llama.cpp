@@ -148,6 +148,10 @@ def parse_args() -> argparse.Namespace:
         "--fuse-gate-up-exps", action="store_true",
         help="Fuse gate_exps and up_exps tensors into a single gate_up_exps tensor for MoE models.",
     )
+    parser.add_argument(
+        "--lstrip-trigger-token", action="append", default=[],
+        help="token after which llama_detokenize should strip one leading space from the next token. Can be specified multiple times.",
+    )
 
     args = parser.parse_args()
     if not args.print_supported_models and args.model is None:
@@ -264,7 +268,8 @@ def main() -> None:
                                      small_first_shard=args.no_tensor_first_split,
                                      remote_hf_model_id=hf_repo_id, disable_mistral_community_chat_template=disable_mistral_community_chat_template,
                                      sentence_transformers_dense_modules=args.sentence_transformers_dense_modules,
-                                     fuse_gate_up_exps=args.fuse_gate_up_exps
+                                     fuse_gate_up_exps=args.fuse_gate_up_exps,
+                                     lstrip_trigger_tokens=args.lstrip_trigger_token,
                                      )
 
         if args.vocab_only:
