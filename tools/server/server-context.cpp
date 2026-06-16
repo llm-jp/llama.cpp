@@ -3076,7 +3076,7 @@ private:
             const bool special = accept_special_token(slot, token);
             const std::string piece = common_token_to_piece(vocab, token, special, lstrip);
             const llama_token_attr attr = llama_vocab_get_attr(vocab, token);
-            slot.lstrip_next_token = (attr & (LLAMA_TOKEN_ATTR_CONTROL | LLAMA_TOKEN_ATTR_USER_DEFINED)) != 0;
+            slot.lstrip_next_token = static_cast<bool>(attr & (LLAMA_TOKEN_ATTR_CONTROL | LLAMA_TOKEN_ATTR_USER_DEFINED));
             return piece;
         };
 

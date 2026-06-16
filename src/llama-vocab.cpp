@@ -3553,7 +3553,7 @@ int32_t llama_vocab::impl::detokenize(
         int32_t n_chars = token_to_piece(token, text, avail, remove_space, unparse_special);
 
         const llama_token_attr attr = token_get_attr(token);
-        remove_space = add_space_prefix && ((attr & (LLAMA_TOKEN_ATTR_CONTROL | LLAMA_TOKEN_ATTR_USER_DEFINED)) != 0);
+        remove_space = add_space_prefix && (attr & (LLAMA_TOKEN_ATTR_CONTROL | LLAMA_TOKEN_ATTR_USER_DEFINED));
         if (n_chars < 0) {
             avail = 0;
             total -= n_chars;
